@@ -77,11 +77,6 @@ func main() {
 		fmt.Println("Failed to bind to port 9092")
 		os.Exit(1)
 	}
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
-	}
 	defer func(listener net.Listener) {
 		err := listener.Close()
 		if err != nil {
@@ -90,46 +85,56 @@ func main() {
 		}
 	}(l)
 	for {
-		var error_code int16 = 0
-		requestHeader, _ := handleRequest(conn)
-		if requestHeader.requestApiVersion < 0 || requestHeader.requestApiVersion > 4 {
-			error_code = 35
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
 		}
-
-		fmt.Printf("RespondHeader len (%d)\n", unsafe.Sizeof(RespondHeader{}))
-		fmt.Printf("ApiKey len (%d)\n", unsafe.Sizeof(ApiKey{}))
-		fmt.Printf("TaggedFields len (%d)\n", unsafe.Sizeof(TaggedFields{}))
-		fmt.Printf("respond len (%d)\n", unsafe.Sizeof(Respond{}))
-
-
-		var respond Respond
-		respond.respondHeader.correlationId = requestHeader.correlationId
-		respond.errorCode = error_code
-		respond.numApiKeys = byte(2)
-		respond.apiKeys.apiKey = 18
-		respond.apiKeys.minVersion = 0
-		respond.apiKeys.maxVersion = 4
+		go func() {
 		
-		buf := &bytes.Buffer{}
-		
-		// binary.Write(buf, binary.BigEndian, respond.respondHeader)
-		// binary.Write(buf, binary.BigEndian, respond.errorCode)
-		// binary.Write(buf, binary.BigEndian, respond.numApiKeys)
-		// binary.Write(buf, binary.BigEndian, respond.apiKeys)
-		// binary.Write(buf, binary.BigEndian, respond.taggedFields)
-		// binary.Write(buf, binary.BigEndian, respond.throttleTimeMs)
-		// binary.Write(buf, binary.BigEndian, respond.taggedFields)
-        // // Correctly calculate message size after writing fields.
-        // respond.respondHeader.messageSize = int32(buf.Len())
-        // binary.BigEndian.PutUint32(buf.Bytes()[:4], uint32(respond.respondHeader.messageSize) - 4)
-		binary.Write(buf, binary.BigEndian, respond)
-		respond.respondHeader.messageSize = int32(buf.Len())
-        binary.BigEndian.PutUint32(buf.Bytes()[:4], uint32(respond.respondHeader.messageSize) - 4)
+			for {
+				var error_code int16 = 0
+				requestHeader, _ := handleRequest(conn)
+				if requestHeader.requestApiVersion < 0 || requestHeader.requestApiVersion > 4 {
+					error_code = 35
+				}
+
+				fmt.Printf("RespondHeader len (%d)\n", unsafe.Sizeof(RespondHeader{}))
+				fmt.Printf("ApiKey len (%d)\n", unsafe.Sizeof(ApiKey{}))
+				fmt.Printf("TaggedFields len (%d)\n", unsafe.Sizeof(TaggedFields{}))
+				fmt.Printf("respond len (%d)\n", unsafe.Sizeof(Respond{}))
 
 
-		fmt.Printf("Afer: Sizeof respond: %d, Sizeof buf: %d, Len of buf: %d\n", unsafe.Sizeof(respond), unsafe.Sizeof(buf), buf.Len() )
-		fmt.Println("Buffer as bytes:", buf.Bytes())
+				var respond Respond
+				respond.respondHeader.correlationId = requestHeader.correlationId
+				respond.errorCode = error_code
+				respond.numApiKeys = byte(2)
+				respond.apiKeys.apiKey = 18
+				respond.apiKeys.minVersion = 0
+				respond.apiKeys.maxVersion = 4
+				
+				buf := &bytes.Buffer{}
+				
+				// binary.Write(buf, binary.BigEndian, respond.respondHeader)
+				// binary.Write(buf, binary.BigEndian, respond.errorCode)
+				// binary.Write(buf, binary.BigEndian, respond.numApiKeys)
+				// binary.Write(buf, binary.BigEndian, respond.apiKeys)
+				// binary.Write(buf, binary.BigEndian, respond.taggedFields)
+				// binary.Write(buf, binary.BigEndian, respond.throttleTimeMs)
+				// binary.Write(buf, binary.BigEndian, respond.taggedFields)
+				// // Correctly calculate message size after writing fields.
+				// respond.respondHeader.messageSize = int32(buf.Len())
+				// binary.BigEndian.PutUint32(buf.Bytes()[:4], uint32(respond.respondHeader.messageSize) - 4)
+				binary.Write(buf, binary.BigEndian, respond)
+				respond.respondHeader.messageSize = int32(buf.Len())
+				binary.BigEndian.PutUint32(buf.Bytes()[:4], uint32(respond.respondHeader.messageSize) - 4)
 
-		conn.Write(buf.Bytes())
+
+				fmt.Printf("Afer: Sizeof respond: %d, Sizeof buf: %d, Len of buf: %d\n", unsafe.Sizeof(respond), unsafe.Sizeof(buf), buf.Len() )
+				fmt.Println("Buffer as bytes:", buf.Bytes())
+
+				conn.Write(buf.Bytes())
+			}
+		}()
 	}
 }
