@@ -32,15 +32,17 @@ func CreateRespond(requestHeader common.RequestHeader) *bytes.Buffer {
 	fmt.Printf("ApiKey len (%d)\n", unsafe.Sizeof(ApiKey{}))
 	fmt.Printf("ApiVersionsResponse len (%d)\n", unsafe.Sizeof(ApiVersionsResponse{}))
 
-	numApiKeys := 1
+	numApiKeys := 2
 	var apiVersionsRespond ApiVersionsResponse
 	var respondHeader common.RespondHeader
 	respondHeader.CorrelationId = requestHeader.CorrelationId
 	apiVersionsRespond.errorCode = error_code
-    apiVersionsRespond.numApiKeys = byte(numApiKeys)
+    apiVersionsRespond.numApiKeys = byte(numApiKeys + 1)
     apiVersionsRespond.apiKeys = make([]ApiKey, numApiKeys)
 	// APIVersions
 	apiVersionsRespond.apiKeys[0] = ApiKey{apiKey: 18, minVersion: 0, maxVersion: 4}
+	// DescribeTopicPartitions
+    apiVersionsRespond.apiKeys[1] = ApiKey{apiKey: 75, minVersion: 0, maxVersion: 0}
 
 	// Wrtie to bytes buffer
 	buf := new(bytes.Buffer)
@@ -51,7 +53,9 @@ func CreateRespond(requestHeader common.RequestHeader) *bytes.Buffer {
 	for _, apiKey := range apiVersionsRespond.apiKeys {
 		binary.Write(buf, binary.BigEndian, apiKey)
 	}
-	//binary.Write(buf, binary.BigEndian, &apiVersionsRespond)
+	binary.Write(buf, binary.BigEndian, apiVersionsRespond.throttleTimeMs)
+	binary.Write(buf, binary.BigEndian, apiVersionsRespond.taggedFields)
+	
 	messageBytes := unsafe.Sizeof(common.MESSAGESIZE(0))
 	binary.BigEndian.PutUint32(buf.Bytes()[:4], uint32(buf.Len()) - uint32(messageBytes))
 	fmt.Printf("Sizeof buf: %d, Len of buf: %d\n", unsafe.Sizeof(buf), buf.Len() )
